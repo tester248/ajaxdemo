@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AJAX Student Search Demo</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; }
+      input[type="search"] { width: 100%; padding: 8px; font-size: 16px; }
+      .result { margin-top: 12px; }
+      .student { border: 1px solid #ddd; padding: 8px; margin-bottom: 8px; border-radius: 4px; }
+      .meta { color: #555; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>Student Search (AJAX)</h1>
+
+    <label for="q">Search students by name, roll, branch or email:</label>
+    <input id="q" type="search" placeholder="Type to search..." autocomplete="off" />
+
+    <div id="status" class="meta">Type to search. Results update without full page refresh.</div>
+    <div id="results" class="result"></div>
+
+    <script>
+      // Minimal debounce to avoid too many requests
+      function debounce(fn, ms) {
+        let t;
+        return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+      }
+
+      const qEl = document.getElementById('q');
+      const resultsEl = document.getElementById('results');
+      const statusEl = document.getElementById('status');
+
+      async function doSearch(query) {
+        if (!query) {
+          resultsEl.innerHTML = '';
+          statusEl.textContent = 'Type to search. Results update without full page refresh.';
+          return;
+        }
+
+        statusEl.textContent = 'Searching...';
+
+        try {
+          // Use fetch API to call search.php. We send GET param 'q'.
+          const url = `search.php?q=${encodeURIComponent(query)}`;
+          const resp = await fetch(url, { method: 'GET' });
+
+          if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+
+          const data = await resp.json();
+
+          if (!Array.isArray(data)) throw new Error('Invalid response');
+
+          renderResults(data);
+          statusEl.textContent = `Found ${data.length} result${data.length !== 1 ? 's' : ''}.`;
+        } catch (err) {
+          statusEl.textContent = 'Error: ' + err.message;
+          resultsEl.innerHTML = '';
+        }
+      }
+
+      function renderResults(items) {
+        if (!items.length) {
+          resultsEl.innerHTML = '<div class="meta">No students found.</div>';
+          return;
+        }
+
+        resultsEl.innerHTML = items.map(s => `
+          <div class="student">
+            <strong>${escapeHtml(s.name)}</strong> <span class="meta">(Roll: ${escapeHtml(s.roll_no)})</span>
+            <div class="meta">Branch: ${escapeHtml(s.branch)} &nbsp; Subjects: ${escapeHtml(s.subjects || '')}</div>
+            <div class="meta">Email: <a href="mailto:${escapeHtml(s.email)}">${escapeHtml(s.email)}</a></div>
+          </div>
+        `).join('');
+      }
+
+      // Simple HTML escaper
+      function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      const debounced = debounce((e) => doSearch(e.target.value.trim()), 300);
+      qEl.addEventListener('input', debounced);
+    </script>
+  </body>
+</html>
